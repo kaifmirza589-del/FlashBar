@@ -28,15 +28,12 @@ class FlashService : Service() {
 
     private var brightness = 1.0f
 
-    // Bar size
     private var barWidth = 100
     private var barHeight = 50
 
-    // Position
     private var posX = 0
     private var posY = 0
 
-    // true = horizontal, false = vertical
     private var horizontal = true
 
     // Move mode
@@ -99,63 +96,50 @@ class FlashService : Service() {
             }
 
             ACTION_BRIGHT_UP -> {
-                brightness =
-                    min(1.0f, brightness + 0.1f)
-
+                brightness = min(1.0f, brightness + 0.1f)
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_BRIGHT_DOWN -> {
-                brightness =
-                    max(0.1f, brightness - 0.1f)
-
+                brightness = max(0.1f, brightness - 0.1f)
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_WIDTH_UP -> {
-                barWidth =
-                    min(1000, barWidth + 50)
-
+                barWidth = min(1000, barWidth + 50)
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_WIDTH_DOWN -> {
-                barWidth =
-                    max(100, barWidth - 50)
-
+                barWidth = max(100, barWidth - 50)
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_HEIGHT_UP -> {
-                barHeight =
-                    min(500, barHeight + 20)
-
+                barHeight = min(500, barHeight + 20)
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_HEIGHT_DOWN -> {
-                barHeight =
-                    max(20, barHeight - 20)
-
+                barHeight = max(20, barHeight - 20)
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_ROTATE -> {
                 horizontal = !horizontal
-
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_MOVE -> {
                 moveMode = !moveMode
-                updateTouchMode()
+                updateMoveButton()
                 updateNotification()
             }
 
@@ -180,8 +164,7 @@ class FlashService : Service() {
         bar.setBackgroundColor(Color.WHITE)
         bar.alpha = brightness
 
-        bar.orientation =
-            LinearLayout.HORIZONTAL
+        bar.orientation = LinearLayout.HORIZONTAL
 
         bar.setPadding(
             8,
@@ -215,96 +198,79 @@ class FlashService : Service() {
 
         flashView = bar
 
-        setupDrag(bar)
-
         updateTouchMode()
     }
 
     private fun addButtons(bar: LinearLayout) {
 
-        val buttonSize = 52
-
         // WIDTH -
-        val widthMinus =
-            createButton("↔−")
+        val widthMinus = createButton("↔−")
 
         widthMinus.setOnClickListener {
 
-            barWidth =
-                max(100, barWidth - 50)
+            barWidth = max(100, barWidth - 50)
 
             saveSettings()
             updateFlashBar()
         }
 
         // WIDTH +
-        val widthPlus =
-            createButton("↔+")
+        val widthPlus = createButton("↔+")
 
         widthPlus.setOnClickListener {
 
-            barWidth =
-                min(1000, barWidth + 50)
+            barWidth = min(1000, barWidth + 50)
 
             saveSettings()
             updateFlashBar()
         }
 
         // HEIGHT -
-        val heightMinus =
-            createButton("↕−")
+        val heightMinus = createButton("↕−")
 
         heightMinus.setOnClickListener {
 
-            barHeight =
-                max(20, barHeight - 20)
+            barHeight = max(20, barHeight - 20)
 
             saveSettings()
             updateFlashBar()
         }
 
         // HEIGHT +
-        val heightPlus =
-            createButton("↕+")
+        val heightPlus = createButton("↕+")
 
         heightPlus.setOnClickListener {
 
-            barHeight =
-                min(500, barHeight + 20)
+            barHeight = min(500, barHeight + 20)
 
             saveSettings()
             updateFlashBar()
         }
 
         // BRIGHTNESS -
-        val brightMinus =
-            createButton("−")
+        val brightMinus = createButton("−")
 
         brightMinus.setOnClickListener {
 
-            brightness =
-                max(0.1f, brightness - 0.1f)
+            brightness = max(0.1f, brightness - 0.1f)
 
             saveSettings()
             updateFlashBar()
         }
 
         // BRIGHTNESS +
-        val brightPlus =
-            createButton("+")
+        val brightPlus = createButton("+")
 
         brightPlus.setOnClickListener {
 
-            brightness =
-                min(1.0f, brightness + 0.1f)
+            brightness = min(1.0f, brightness + 0.1f)
 
             saveSettings()
             updateFlashBar()
         }
 
         // ROTATE
-        val rotate =
-            createButton("▣")
+        val rotate = createButton("▣")
 
         rotate.setOnClickListener {
 
@@ -314,9 +280,24 @@ class FlashService : Service() {
             updateFlashBar()
         }
 
+        // MOVE
+        val move = createButton("✥")
+
+        move.id = View.generateViewId()
+
+        move.setOnClickListener {
+
+            moveMode = !moveMode
+
+            move.text =
+                if (moveMode) "✓" else "✥"
+
+            updateMoveButton()
+            updateNotification()
+        }
+
         // OFF
-        val off =
-            createButton("⏻")
+        val off = createButton("⏻")
 
         off.setOnClickListener {
 
@@ -331,24 +312,30 @@ class FlashService : Service() {
         bar.addView(brightMinus)
         bar.addView(brightPlus)
         bar.addView(rotate)
+        bar.addView(move)
         bar.addView(off)
+
+        /*
+         * IMPORTANT:
+         * Drag listener ab poore bar par nahi hai.
+         * Isse buttons ka click properly work karega.
+         *
+         * White bar ke khaali area se drag hoga.
+         */
+        setupDragArea(bar)
     }
 
     private fun createButton(text: String): TextView {
 
-        val button =
-            TextView(this)
+        val button = TextView(this)
 
         button.text = text
-
         button.textSize = 20f
 
         button.setTextColor(Color.WHITE)
-
         button.setBackgroundColor(Color.BLACK)
 
-        button.gravity =
-            Gravity.CENTER
+        button.gravity = Gravity.CENTER
 
         button.setPadding(
             10,
@@ -375,16 +362,32 @@ class FlashService : Service() {
         return button
     }
 
-    private fun setupDrag(bar: LinearLayout) {
+    /*
+     * Drag area:
+     * Buttons ke touch ko disturb nahi karta.
+     *
+     * Move ON hone par white bar ke khaali area
+     * ko pakad kar move kar sakte ho.
+     */
+    private fun setupDragArea(bar: LinearLayout) {
 
         var startX = 0
         var startY = 0
+
         var touchX = 0f
         var touchY = 0f
 
-        bar.setOnTouchListener { _, event ->
+        bar.setOnTouchListener { view, event ->
 
             if (!moveMode) {
+                return@setOnTouchListener false
+            }
+
+            /*
+             * Agar touch kisi button par hai,
+             * button ko click karne do.
+             */
+            if (event.targetIsButton(view)) {
                 return@setOnTouchListener false
             }
 
@@ -392,7 +395,9 @@ class FlashService : Service() {
 
                 MotionEvent.ACTION_DOWN -> {
 
-                    val params = barParams ?: return@setOnTouchListener false
+                    val params =
+                        barParams
+                            ?: return@setOnTouchListener false
 
                     startX = params.x
                     startY = params.y
@@ -405,8 +410,9 @@ class FlashService : Service() {
 
                 MotionEvent.ACTION_MOVE -> {
 
-                    val params = barParams
-                        ?: return@setOnTouchListener false
+                    val params =
+                        barParams
+                            ?: return@setOnTouchListener false
 
                     params.x =
                         startX +
@@ -439,21 +445,52 @@ class FlashService : Service() {
         }
     }
 
-    private fun updateTouchMode() {
+    /*
+     * Check karta hai ki touch kisi TextView/button par
+     * hua hai ya nahi.
+     */
+    private fun MotionEvent.targetIsButton(
+        root: View
+    ): Boolean {
+
+        val x = x.toInt()
+        val y = y.toInt()
+
+        if (root is LinearLayout) {
+
+            for (i in 0 until root.childCount) {
+
+                val child = root.getChildAt(i)
+
+                if (
+                    x >= child.left &&
+                    x <= child.right &&
+                    y >= child.top &&
+                    y <= child.bottom
+                ) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    private fun updateMoveButton() {
 
         flashView?.let { bar ->
 
             if (moveMode) {
-
-                bar.alpha =
-                    min(1.0f, brightness)
-
+                bar.alpha = min(1.0f, brightness)
             } else {
-
-                bar.alpha =
-                    brightness
+                bar.alpha = brightness
             }
         }
+    }
+
+    private fun updateTouchMode() {
+
+        updateMoveButton()
     }
 
     private fun updateFlashBar() {
