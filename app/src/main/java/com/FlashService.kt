@@ -23,20 +23,20 @@ import kotlin.math.min
 class FlashService : Service() {
 
     private lateinit var windowManager: WindowManager
+
     private var flashView: LinearLayout? = null
     private var barParams: WindowManager.LayoutParams? = null
 
     private var brightness = 1.0f
 
-    private var barWidth = 100
-    private var barHeight = 50
+    private var barWidth = 500
+    private var barHeight = 80
 
     private var posX = 0
     private var posY = 0
 
     private var horizontal = true
 
-    // Move mode
     private var moveMode = false
 
     companion object {
@@ -45,34 +45,50 @@ class FlashService : Service() {
         const val NOTIFICATION_ID = 1001
 
         const val ACTION_TOGGLE = "com.flashbar.TOGGLE"
-        const val ACTION_BRIGHT_UP = "com.flashbar.BRIGHT_UP"
-        const val ACTION_BRIGHT_DOWN = "com.flashbar.BRIGHT_DOWN"
 
-        const val ACTION_WIDTH_UP = "com.flashbar.WIDTH_UP"
-        const val ACTION_WIDTH_DOWN = "com.flashbar.WIDTH_DOWN"
+        const val ACTION_BRIGHT_UP =
+            "com.flashbar.BRIGHT_UP"
 
-        const val ACTION_HEIGHT_UP = "com.flashbar.HEIGHT_UP"
-        const val ACTION_HEIGHT_DOWN = "com.flashbar.HEIGHT_DOWN"
+        const val ACTION_BRIGHT_DOWN =
+            "com.flashbar.BRIGHT_DOWN"
 
-        const val ACTION_ROTATE = "com.flashbar.ROTATE"
-        const val ACTION_MOVE = "com.flashbar.MOVE"
-        const val ACTION_OFF = "com.flashbar.OFF"
+        const val ACTION_WIDTH_UP =
+            "com.flashbar.WIDTH_UP"
+
+        const val ACTION_WIDTH_DOWN =
+            "com.flashbar.WIDTH_DOWN"
+
+        const val ACTION_HEIGHT_UP =
+            "com.flashbar.HEIGHT_UP"
+
+        const val ACTION_HEIGHT_DOWN =
+            "com.flashbar.HEIGHT_DOWN"
+
+        const val ACTION_ROTATE =
+            "com.flashbar.ROTATE"
+
+        const val ACTION_MOVE =
+            "com.flashbar.MOVE"
+
+        const val ACTION_OFF =
+            "com.flashbar.OFF"
     }
 
     override fun onCreate() {
         super.onCreate()
 
         windowManager =
-            getSystemService(WINDOW_SERVICE) as WindowManager
+            getSystemService(WINDOW_SERVICE)
+                    as WindowManager
 
         createNotificationChannel()
+
+        loadSettings()
 
         startForeground(
             NOTIFICATION_ID,
             createNotification()
         )
-
-        loadSettings()
 
         if (Settings.canDrawOverlays(this)) {
             showFlashBar()
@@ -88,6 +104,7 @@ class FlashService : Service() {
         when (intent?.action) {
 
             ACTION_TOGGLE -> {
+
                 if (flashView == null) {
                     showFlashBar()
                 } else {
@@ -96,56 +113,99 @@ class FlashService : Service() {
             }
 
             ACTION_BRIGHT_UP -> {
-                brightness = min(1.0f, brightness + 0.1f)
+
+                brightness =
+                    min(
+                        1.0f,
+                        brightness + 0.1f
+                    )
+
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_BRIGHT_DOWN -> {
-                brightness = max(0.1f, brightness - 0.1f)
+
+                brightness =
+                    max(
+                        0.1f,
+                        brightness - 0.1f
+                    )
+
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_WIDTH_UP -> {
-                barWidth = min(1000, barWidth + 50)
+
+                barWidth =
+                    min(
+                        1000,
+                        barWidth + 50
+                    )
+
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_WIDTH_DOWN -> {
-                barWidth = max(100, barWidth - 50)
+
+                barWidth =
+                    max(
+                        100,
+                        barWidth - 50
+                    )
+
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_HEIGHT_UP -> {
-                barHeight = min(500, barHeight + 20)
+
+                barHeight =
+                    min(
+                        500,
+                        barHeight + 20
+                    )
+
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_HEIGHT_DOWN -> {
-                barHeight = max(20, barHeight - 20)
+
+                barHeight =
+                    max(
+                        20,
+                        barHeight - 20
+                    )
+
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_ROTATE -> {
+
                 horizontal = !horizontal
+
                 saveSettings()
                 updateFlashBar()
             }
 
             ACTION_MOVE -> {
+
                 moveMode = !moveMode
+
                 updateMoveButton()
                 updateNotification()
             }
 
             ACTION_OFF -> {
+
                 removeFlashBar()
+
                 stopSelf()
+
                 return START_NOT_STICKY
             }
         }
@@ -159,12 +219,20 @@ class FlashService : Service() {
 
         if (flashView != null) return
 
-        val bar = LinearLayout(this)
+        val bar =
+            LinearLayout(this)
 
-        bar.setBackgroundColor(Color.WHITE)
+        bar.setBackgroundColor(
+            Color.WHITE
+        )
+
         bar.alpha = brightness
 
-        bar.orientation = LinearLayout.HORIZONTAL
+        bar.orientation =
+            if (horizontal)
+                LinearLayout.HORIZONTAL
+            else
+                LinearLayout.VERTICAL
 
         bar.setPadding(
             8,
@@ -175,15 +243,28 @@ class FlashService : Service() {
 
         val params =
             WindowManager.LayoutParams(
-                if (horizontal) barWidth else barHeight,
-                if (horizontal) barHeight else barWidth,
+
+                if (horizontal)
+                    barWidth
+                else
+                    barHeight,
+
+                if (horizontal)
+                    barHeight
+                else
+                    barWidth,
+
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+
                 PixelFormat.TRANSLUCENT
             )
 
-        params.gravity = Gravity.TOP or Gravity.START
+        params.gravity =
+            Gravity.TOP or Gravity.START
+
         params.x = posX
         params.y = posY
 
@@ -198,79 +279,105 @@ class FlashService : Service() {
 
         flashView = bar
 
-        updateTouchMode()
+        updateMoveButton()
     }
 
-    private fun addButtons(bar: LinearLayout) {
+    private fun addButtons(
+        bar: LinearLayout
+    ) {
 
-        // WIDTH -
-        val widthMinus = createButton("↔−")
+        val widthMinus =
+            createButton("↔−")
 
         widthMinus.setOnClickListener {
 
-            barWidth = max(100, barWidth - 50)
+            barWidth =
+                max(
+                    100,
+                    barWidth - 50
+                )
 
             saveSettings()
             updateFlashBar()
         }
 
-        // WIDTH +
-        val widthPlus = createButton("↔+")
+        val widthPlus =
+            createButton("↔+")
 
         widthPlus.setOnClickListener {
 
-            barWidth = min(1000, barWidth + 50)
+            barWidth =
+                min(
+                    1000,
+                    barWidth + 50
+                )
 
             saveSettings()
             updateFlashBar()
         }
 
-        // HEIGHT -
-        val heightMinus = createButton("↕−")
+        val heightMinus =
+            createButton("↕−")
 
         heightMinus.setOnClickListener {
 
-            barHeight = max(20, barHeight - 20)
+            barHeight =
+                max(
+                    20,
+                    barHeight - 20
+                )
 
             saveSettings()
             updateFlashBar()
         }
 
-        // HEIGHT +
-        val heightPlus = createButton("↕+")
+        val heightPlus =
+            createButton("↕+")
 
         heightPlus.setOnClickListener {
 
-            barHeight = min(500, barHeight + 20)
+            barHeight =
+                min(
+                    500,
+                    barHeight + 20
+                )
 
             saveSettings()
             updateFlashBar()
         }
 
-        // BRIGHTNESS -
-        val brightMinus = createButton("−")
+        val brightMinus =
+            createButton("−")
 
         brightMinus.setOnClickListener {
 
-            brightness = max(0.1f, brightness - 0.1f)
+            brightness =
+                max(
+                    0.1f,
+                    brightness - 0.1f
+                )
 
             saveSettings()
             updateFlashBar()
         }
 
-        // BRIGHTNESS +
-        val brightPlus = createButton("+")
+        val brightPlus =
+            createButton("+")
 
         brightPlus.setOnClickListener {
 
-            brightness = min(1.0f, brightness + 0.1f)
+            brightness =
+                min(
+                    1.0f,
+                    brightness + 0.1f
+                )
 
             saveSettings()
             updateFlashBar()
         }
 
-        // ROTATE
-        val rotate = createButton("▣")
+        val rotate =
+            createButton("▣")
 
         rotate.setOnClickListener {
 
@@ -280,24 +387,32 @@ class FlashService : Service() {
             updateFlashBar()
         }
 
-        // MOVE
-        val move = createButton("✥")
-
-        move.id = View.generateViewId()
+        /*
+         * MOVE BUTTON
+         *
+         * Is button ko press karke hold/drag karne
+         * se bar move hoga.
+         */
+        val move =
+            createButton("✥")
 
         move.setOnClickListener {
 
             moveMode = !moveMode
 
             move.text =
-                if (moveMode) "✓" else "✥"
+                if (moveMode)
+                    "✓"
+                else
+                    "✥"
 
-            updateMoveButton()
             updateNotification()
         }
 
-        // OFF
-        val off = createButton("⏻")
+        setupMoveDrag(move)
+
+        val off =
+            createButton("⏻")
 
         off.setOnClickListener {
 
@@ -314,28 +429,28 @@ class FlashService : Service() {
         bar.addView(rotate)
         bar.addView(move)
         bar.addView(off)
-
-        /*
-         * IMPORTANT:
-         * Drag listener ab poore bar par nahi hai.
-         * Isse buttons ka click properly work karega.
-         *
-         * White bar ke khaali area se drag hoga.
-         */
-        setupDragArea(bar)
     }
 
-    private fun createButton(text: String): TextView {
+    private fun createButton(
+        text: String
+    ): TextView {
 
-        val button = TextView(this)
+        val button =
+            TextView(this)
 
         button.text = text
         button.textSize = 20f
 
-        button.setTextColor(Color.WHITE)
-        button.setBackgroundColor(Color.BLACK)
+        button.setTextColor(
+            Color.WHITE
+        )
 
-        button.gravity = Gravity.CENTER
+        button.setBackgroundColor(
+            Color.BLACK
+        )
+
+        button.gravity =
+            Gravity.CENTER
 
         button.setPadding(
             10,
@@ -363,13 +478,17 @@ class FlashService : Service() {
     }
 
     /*
-     * Drag area:
-     * Buttons ke touch ko disturb nahi karta.
+     * MOVE BUTTON DRAG
      *
-     * Move ON hone par white bar ke khaali area
-     * ko pakad kar move kar sakte ho.
+     * MOVE (✥) press karo.
+     * Button ✓ ban jayega.
+     *
+     * Ab isi MOVE button ko finger se
+     * drag karke poori bar ko move karo.
      */
-    private fun setupDragArea(bar: LinearLayout) {
+    private fun setupMoveDrag(
+        moveButton: TextView
+    ) {
 
         var startX = 0
         var startY = 0
@@ -377,17 +496,9 @@ class FlashService : Service() {
         var touchX = 0f
         var touchY = 0f
 
-        bar.setOnTouchListener { view, event ->
+        moveButton.setOnTouchListener { _, event ->
 
             if (!moveMode) {
-                return@setOnTouchListener false
-            }
-
-            /*
-             * Agar touch kisi button par hai,
-             * button ko click karne do.
-             */
-            if (event.targetIsButton(view)) {
                 return@setOnTouchListener false
             }
 
@@ -416,14 +527,24 @@ class FlashService : Service() {
 
                     params.x =
                         startX +
-                                (event.rawX - touchX).toInt()
+                                (
+                                        event.rawX -
+                                                touchX
+                                        ).toInt()
 
                     params.y =
                         startY +
-                                (event.rawY - touchY).toInt()
+                                (
+                                        event.rawY -
+                                                touchY
+                                        ).toInt()
 
                     posX = params.x
                     posY = params.y
+
+                    val bar =
+                        flashView
+                            ?: return@setOnTouchListener false
 
                     windowManager.updateViewLayout(
                         bar,
@@ -445,73 +566,42 @@ class FlashService : Service() {
         }
     }
 
-    /*
-     * Check karta hai ki touch kisi TextView/button par
-     * hua hai ya nahi.
-     */
-    private fun MotionEvent.targetIsButton(
-        root: View
-    ): Boolean {
-
-        val x = x.toInt()
-        val y = y.toInt()
-
-        if (root is LinearLayout) {
-
-            for (i in 0 until root.childCount) {
-
-                val child = root.getChildAt(i)
-
-                if (
-                    x >= child.left &&
-                    x <= child.right &&
-                    y >= child.top &&
-                    y <= child.bottom
-                ) {
-                    return true
-                }
-            }
-        }
-
-        return false
-    }
-
     private fun updateMoveButton() {
 
-        flashView?.let { bar ->
+        val bar =
+            flashView ?: return
 
-            if (moveMode) {
-                bar.alpha = min(1.0f, brightness)
-            } else {
-                bar.alpha = brightness
-            }
-        }
-    }
-
-    private fun updateTouchMode() {
-
-        updateMoveButton()
+        bar.alpha = brightness
     }
 
     private fun updateFlashBar() {
 
-        val bar = flashView ?: return
-        val params = barParams ?: return
+        val bar =
+            flashView ?: return
+
+        val params =
+            barParams ?: return
 
         bar.alpha = brightness
 
         if (horizontal) {
 
-            params.width = barWidth
-            params.height = barHeight
+            params.width =
+                barWidth
+
+            params.height =
+                barHeight
 
             bar.orientation =
                 LinearLayout.HORIZONTAL
 
         } else {
 
-            params.width = barHeight
-            params.height = barWidth
+            params.width =
+                barHeight
+
+            params.height =
+                barWidth
 
             bar.orientation =
                 LinearLayout.VERTICAL
@@ -531,7 +621,11 @@ class FlashService : Service() {
         flashView?.let {
 
             try {
-                windowManager.removeView(it)
+
+                windowManager.removeView(
+                    it
+                )
+
             } catch (_: Exception) {
             }
         }
@@ -542,7 +636,10 @@ class FlashService : Service() {
 
     private fun createNotificationChannel() {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.O
+        ) {
 
             val channel =
                 NotificationChannel(
@@ -588,13 +685,10 @@ class FlashService : Service() {
 
     private fun createNotification(): Notification {
 
-        val builder =
-            Notification.Builder(
-                this,
-                CHANNEL_ID
-            )
-
-        builder
+        return Notification.Builder(
+            this,
+            CHANNEL_ID
+        )
             .setSmallIcon(
                 android.R.drawable.ic_menu_view
             )
@@ -602,7 +696,7 @@ class FlashService : Service() {
                 "FlashBar is running"
             )
             .setContentText(
-                "Width ${barWidth} • Height ${barHeight}"
+                "Width $barWidth • Height $barHeight"
             )
             .setOngoing(true)
             .setCategory(
@@ -613,7 +707,9 @@ class FlashService : Service() {
                 Notification.Action.Builder(
                     null,
                     "W−",
-                    actionIntent(ACTION_WIDTH_DOWN)
+                    actionIntent(
+                        ACTION_WIDTH_DOWN
+                    )
                 ).build()
             )
 
@@ -621,7 +717,9 @@ class FlashService : Service() {
                 Notification.Action.Builder(
                     null,
                     "W+",
-                    actionIntent(ACTION_WIDTH_UP)
+                    actionIntent(
+                        ACTION_WIDTH_UP
+                    )
                 ).build()
             )
 
@@ -629,7 +727,9 @@ class FlashService : Service() {
                 Notification.Action.Builder(
                     null,
                     "H−",
-                    actionIntent(ACTION_HEIGHT_DOWN)
+                    actionIntent(
+                        ACTION_HEIGHT_DOWN
+                    )
                 ).build()
             )
 
@@ -637,7 +737,9 @@ class FlashService : Service() {
                 Notification.Action.Builder(
                     null,
                     "H+",
-                    actionIntent(ACTION_HEIGHT_UP)
+                    actionIntent(
+                        ACTION_HEIGHT_UP
+                    )
                 ).build()
             )
 
@@ -645,7 +747,9 @@ class FlashService : Service() {
                 Notification.Action.Builder(
                     null,
                     "Bright−",
-                    actionIntent(ACTION_BRIGHT_DOWN)
+                    actionIntent(
+                        ACTION_BRIGHT_DOWN
+                    )
                 ).build()
             )
 
@@ -653,7 +757,9 @@ class FlashService : Service() {
                 Notification.Action.Builder(
                     null,
                     "Bright+",
-                    actionIntent(ACTION_BRIGHT_UP)
+                    actionIntent(
+                        ACTION_BRIGHT_UP
+                    )
                 ).build()
             )
 
@@ -661,7 +767,9 @@ class FlashService : Service() {
                 Notification.Action.Builder(
                     null,
                     "Rotate",
-                    actionIntent(ACTION_ROTATE)
+                    actionIntent(
+                        ACTION_ROTATE
+                    )
                 ).build()
             )
 
@@ -669,7 +777,9 @@ class FlashService : Service() {
                 Notification.Action.Builder(
                     null,
                     "Move",
-                    actionIntent(ACTION_MOVE)
+                    actionIntent(
+                        ACTION_MOVE
+                    )
                 ).build()
             )
 
@@ -677,11 +787,13 @@ class FlashService : Service() {
                 Notification.Action.Builder(
                     null,
                     "OFF",
-                    actionIntent(ACTION_OFF)
+                    actionIntent(
+                        ACTION_OFF
+                    )
                 ).build()
             )
 
-        return builder.build()
+            .build()
     }
 
     private fun updateNotification() {
@@ -706,30 +818,37 @@ class FlashService : Service() {
             )
 
         prefs.edit()
+
             .putFloat(
                 "brightness",
                 brightness
             )
+
             .putInt(
                 "barWidth",
                 barWidth
             )
+
             .putInt(
                 "barHeight",
                 barHeight
             )
+
             .putInt(
                 "posX",
                 posX
             )
+
             .putInt(
                 "posY",
                 posY
             )
+
             .putBoolean(
                 "horizontal",
                 horizontal
             )
+
             .apply()
     }
 
