@@ -13,7 +13,6 @@ import android.os.IBinder
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
-import android.view.View
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -25,16 +24,20 @@ class FlashService : Service() {
     private lateinit var windowManager: WindowManager
 
     private var flashView: LinearLayout? = null
+    private var moveButton: TextView? = null
     private var barParams: WindowManager.LayoutParams? = null
 
     private var brightness = 1.0f
 
-    private var barWidth = 500
-    private var barHeight = 80
+    // Length and thickness
+    private var barLength = 500
+    private var barThickness = 80
 
+    // Position
     private var posX = 0
     private var posY = 0
 
+    // true = horizontal, false = vertical
     private var horizontal = true
 
     private var moveMode = false
@@ -136,48 +139,52 @@ class FlashService : Service() {
                 updateFlashBar()
             }
 
+            // L = longer
             ACTION_WIDTH_UP -> {
 
-                barWidth =
+                barLength =
                     min(
-                        1000,
-                        barWidth + 50
+                        1500,
+                        barLength + 50
                     )
 
                 saveSettings()
                 updateFlashBar()
             }
 
+            // S = shorter
             ACTION_WIDTH_DOWN -> {
 
-                barWidth =
+                barLength =
                     max(
                         100,
-                        barWidth - 50
+                        barLength - 50
                     )
 
                 saveSettings()
                 updateFlashBar()
             }
 
+            // B = bigger/thicker
             ACTION_HEIGHT_UP -> {
 
-                barHeight =
+                barThickness =
                     min(
                         500,
-                        barHeight + 20
+                        barThickness + 20
                     )
 
                 saveSettings()
                 updateFlashBar()
             }
 
+            // P = thinner
             ACTION_HEIGHT_DOWN -> {
 
-                barHeight =
+                barThickness =
                     max(
                         20,
-                        barHeight - 20
+                        barThickness - 20
                     )
 
                 saveSettings()
@@ -196,7 +203,10 @@ class FlashService : Service() {
 
                 moveMode = !moveMode
 
-                updateMoveButton()
+                moveButton?.text =
+                    if (moveMode) "✓"
+                    else "✥"
+
                 updateNotification()
             }
 
@@ -228,31 +238,33 @@ class FlashService : Service() {
 
         bar.alpha = brightness
 
+        /*
+         * Screen par sirf MOVE button.
+         * Bar ka actual white area transparent
+         * touch area ke saath rahega.
+         */
         bar.orientation =
-            if (horizontal)
-                LinearLayout.HORIZONTAL
-            else
-                LinearLayout.VERTICAL
+            LinearLayout.HORIZONTAL
 
         bar.setPadding(
-            8,
-            8,
-            8,
-            8
+            0,
+            0,
+            0,
+            0
         )
 
         val params =
             WindowManager.LayoutParams(
 
                 if (horizontal)
-                    barWidth
+                    barLength
                 else
-                    barHeight,
+                    barThickness,
 
                 if (horizontal)
-                    barHeight
+                    barThickness
                 else
-                    barWidth,
+                    barLength,
 
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
 
@@ -270,7 +282,7 @@ class FlashService : Service() {
 
         barParams = params
 
-        addButtons(bar)
+        addMoveButton(bar)
 
         windowManager.addView(
             bar,
@@ -278,167 +290,21 @@ class FlashService : Service() {
         )
 
         flashView = bar
-
-        updateMoveButton()
     }
 
-    private fun addButtons(
+    private fun addMoveButton(
         bar: LinearLayout
     ) {
-
-        val widthMinus =
-            createButton("↔−")
-
-        widthMinus.setOnClickListener {
-
-            barWidth =
-                max(
-                    100,
-                    barWidth - 50
-                )
-
-            saveSettings()
-            updateFlashBar()
-        }
-
-        val widthPlus =
-            createButton("↔+")
-
-        widthPlus.setOnClickListener {
-
-            barWidth =
-                min(
-                    1000,
-                    barWidth + 50
-                )
-
-            saveSettings()
-            updateFlashBar()
-        }
-
-        val heightMinus =
-            createButton("↕−")
-
-        heightMinus.setOnClickListener {
-
-            barHeight =
-                max(
-                    20,
-                    barHeight - 20
-                )
-
-            saveSettings()
-            updateFlashBar()
-        }
-
-        val heightPlus =
-            createButton("↕+")
-
-        heightPlus.setOnClickListener {
-
-            barHeight =
-                min(
-                    500,
-                    barHeight + 20
-                )
-
-            saveSettings()
-            updateFlashBar()
-        }
-
-        val brightMinus =
-            createButton("−")
-
-        brightMinus.setOnClickListener {
-
-            brightness =
-                max(
-                    0.1f,
-                    brightness - 0.1f
-                )
-
-            saveSettings()
-            updateFlashBar()
-        }
-
-        val brightPlus =
-            createButton("+")
-
-        brightPlus.setOnClickListener {
-
-            brightness =
-                min(
-                    1.0f,
-                    brightness + 0.1f
-                )
-
-            saveSettings()
-            updateFlashBar()
-        }
-
-        val rotate =
-            createButton("▣")
-
-        rotate.setOnClickListener {
-
-            horizontal = !horizontal
-
-            saveSettings()
-            updateFlashBar()
-        }
-
-        /*
-         * MOVE BUTTON
-         *
-         * Is button ko press karke hold/drag karne
-         * se bar move hoga.
-         */
-        val move =
-            createButton("✥")
-
-        move.setOnClickListener {
-
-            moveMode = !moveMode
-
-            move.text =
-                if (moveMode)
-                    "✓"
-                else
-                    "✥"
-
-            updateNotification()
-        }
-
-        setupMoveDrag(move)
-
-        val off =
-            createButton("⏻")
-
-        off.setOnClickListener {
-
-            removeFlashBar()
-            stopSelf()
-        }
-
-        bar.addView(widthMinus)
-        bar.addView(widthPlus)
-        bar.addView(heightMinus)
-        bar.addView(heightPlus)
-        bar.addView(brightMinus)
-        bar.addView(brightPlus)
-        bar.addView(rotate)
-        bar.addView(move)
-        bar.addView(off)
-    }
-
-    private fun createButton(
-        text: String
-    ): TextView {
 
         val button =
             TextView(this)
 
-        button.text = text
+        moveButton = button
+
+        button.text =
+            if (moveMode) "✓"
+            else "✥"
+
         button.textSize = 20f
 
         button.setTextColor(
@@ -459,35 +325,35 @@ class FlashService : Service() {
             0
         )
 
-        val params =
+        val buttonParams =
             LinearLayout.LayoutParams(
-                52,
-                52
+                60,
+                60
             )
 
-        params.setMargins(
-            6,
-            0,
-            6,
-            0
-        )
+        button.layoutParams =
+            buttonParams
 
-        button.layoutParams = params
+        button.setOnClickListener {
 
-        return button
+            moveMode = !moveMode
+
+            button.text =
+                if (moveMode)
+                    "✓"
+                else
+                    "✥"
+
+            updateNotification()
+        }
+
+        setupMoveDrag(button)
+
+        bar.addView(button)
     }
 
-    /*
-     * MOVE BUTTON DRAG
-     *
-     * MOVE (✥) press karo.
-     * Button ✓ ban jayega.
-     *
-     * Ab isi MOVE button ko finger se
-     * drag karke poori bar ko move karo.
-     */
     private fun setupMoveDrag(
-        moveButton: TextView
+        button: TextView
     ) {
 
         var startX = 0
@@ -496,7 +362,7 @@ class FlashService : Service() {
         var touchX = 0f
         var touchY = 0f
 
-        moveButton.setOnTouchListener { _, event ->
+        button.setOnTouchListener { _, event ->
 
             if (!moveMode) {
                 return@setOnTouchListener false
@@ -528,16 +394,16 @@ class FlashService : Service() {
                     params.x =
                         startX +
                                 (
-                                        event.rawX -
-                                                touchX
-                                        ).toInt()
+                                    event.rawX -
+                                            touchX
+                                    ).toInt()
 
                     params.y =
                         startY +
                                 (
-                                        event.rawY -
-                                                touchY
-                                        ).toInt()
+                                    event.rawY -
+                                            touchY
+                                    ).toInt()
 
                     posX = params.x
                     posY = params.y
@@ -566,14 +432,6 @@ class FlashService : Service() {
         }
     }
 
-    private fun updateMoveButton() {
-
-        val bar =
-            flashView ?: return
-
-        bar.alpha = brightness
-    }
-
     private fun updateFlashBar() {
 
         val bar =
@@ -587,24 +445,18 @@ class FlashService : Service() {
         if (horizontal) {
 
             params.width =
-                barWidth
+                barLength
 
             params.height =
-                barHeight
-
-            bar.orientation =
-                LinearLayout.HORIZONTAL
+                barThickness
 
         } else {
 
             params.width =
-                barHeight
+                barThickness
 
             params.height =
-                barWidth
-
-            bar.orientation =
-                LinearLayout.VERTICAL
+                barLength
         }
 
         params.x = posX
@@ -621,16 +473,13 @@ class FlashService : Service() {
         flashView?.let {
 
             try {
-
-                windowManager.removeView(
-                    it
-                )
-
+                windowManager.removeView(it)
             } catch (_: Exception) {
             }
         }
 
         flashView = null
+        moveButton = null
         barParams = null
     }
 
@@ -649,7 +498,7 @@ class FlashService : Service() {
                 )
 
             channel.description =
-                "FlashBar persistent controls"
+                "FlashBar Controls"
 
             val manager =
                 getSystemService(
@@ -689,107 +538,97 @@ class FlashService : Service() {
             this,
             CHANNEL_ID
         )
+
             .setSmallIcon(
                 android.R.drawable.ic_menu_view
             )
+
             .setContentTitle(
-                "FlashBar is running"
+                "FlashBar"
             )
+
             .setContentText(
-                "Width $barWidth • Height $barHeight"
+                if (flashView != null)
+                    "ON"
+                else
+                    "OFF"
             )
+
             .setOngoing(true)
+
             .setCategory(
                 Notification.CATEGORY_SERVICE
             )
 
+            // ON / OFF
             .addAction(
                 Notification.Action.Builder(
                     null,
-                    "W−",
-                    actionIntent(
-                        ACTION_WIDTH_DOWN
-                    )
+                    "ON/OFF",
+                    actionIntent(ACTION_TOGGLE)
                 ).build()
             )
 
+            // Brightness -
             .addAction(
                 Notification.Action.Builder(
                     null,
-                    "W+",
-                    actionIntent(
-                        ACTION_WIDTH_UP
-                    )
+                    "D−",
+                    actionIntent(ACTION_BRIGHT_DOWN)
                 ).build()
             )
 
+            // Brightness +
             .addAction(
                 Notification.Action.Builder(
                     null,
-                    "H−",
-                    actionIntent(
-                        ACTION_HEIGHT_DOWN
-                    )
+                    "D+",
+                    actionIntent(ACTION_BRIGHT_UP)
                 ).build()
             )
 
+            // Shorter
             .addAction(
                 Notification.Action.Builder(
                     null,
-                    "H+",
-                    actionIntent(
-                        ACTION_HEIGHT_UP
-                    )
+                    "S",
+                    actionIntent(ACTION_WIDTH_DOWN)
                 ).build()
             )
 
+            // Longer
             .addAction(
                 Notification.Action.Builder(
                     null,
-                    "Bright−",
-                    actionIntent(
-                        ACTION_BRIGHT_DOWN
-                    )
+                    "L",
+                    actionIntent(ACTION_WIDTH_UP)
                 ).build()
             )
 
+            // Thicker
             .addAction(
                 Notification.Action.Builder(
                     null,
-                    "Bright+",
-                    actionIntent(
-                        ACTION_BRIGHT_UP
-                    )
+                    "B",
+                    actionIntent(ACTION_HEIGHT_UP)
                 ).build()
             )
 
+            // Thinner
             .addAction(
                 Notification.Action.Builder(
                     null,
-                    "Rotate",
-                    actionIntent(
-                        ACTION_ROTATE
-                    )
+                    "P",
+                    actionIntent(ACTION_HEIGHT_DOWN)
                 ).build()
             )
 
+            // Vertical
             .addAction(
                 Notification.Action.Builder(
                     null,
-                    "Move",
-                    actionIntent(
-                        ACTION_MOVE
-                    )
-                ).build()
-            )
-
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    "OFF",
-                    actionIntent(
-                        ACTION_OFF
-                    )
+                    "V",
+                    actionIntent(ACTION_ROTATE)
                 ).build()
             )
 
@@ -825,13 +664,13 @@ class FlashService : Service() {
             )
 
             .putInt(
-                "barWidth",
-                barWidth
+                "barLength",
+                barLength
             )
 
             .putInt(
-                "barHeight",
-                barHeight
+                "barThickness",
+                barThickness
             )
 
             .putInt(
@@ -866,15 +705,15 @@ class FlashService : Service() {
                 1.0f
             )
 
-        barWidth =
+        barLength =
             prefs.getInt(
-                "barWidth",
+                "barLength",
                 500
             )
 
-        barHeight =
+        barThickness =
             prefs.getInt(
-                "barHeight",
+                "barThickness",
                 80
             )
 
@@ -907,6 +746,7 @@ class FlashService : Service() {
     override fun onBind(
         intent: Intent?
     ): IBinder? {
+
         return null
     }
 }
