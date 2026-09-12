@@ -1,752 +1,132 @@
 package com.flashbar
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
+import android.Manifest
 import android.content.Intent
-import android.graphics.Color
-import android.graphics.PixelFormat
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
-import android.os.IBinder
+import android.os.Bundle
 import android.provider.Settings
-import android.view.Gravity
-import android.view.MotionEvent
-import android.view.WindowManager
-import android.widget.LinearLayout
-import android.widget.TextView
-import kotlin.math.max
-import kotlin.math.min
+import android.view.View
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
-class FlashService : Service() {
+class MainActivity : AppCompatActivity() {
 
-    private lateinit var windowManager: WindowManager
+    override fun onCreate(
+        savedInstanceState: Bundle?
+    ) {
+        super.onCreate(savedInstanceState)
 
-    private var flashView: LinearLayout? = null
-    private var moveButton: TextView? = null
-    private var barParams: WindowManager.LayoutParams? = null
-
-    private var brightness = 1.0f
-
-    // Length and thickness
-    private var barLength = 500
-    private var barThickness = 80
-
-    // Position
-    private var posX = 0
-    private var posY = 0
-
-    // true = horizontal, false = vertical
-    private var horizontal = true
-
-    private var moveMode = false
-
-    companion object {
-
-        const val CHANNEL_ID = "FlashBarChannel"
-        const val NOTIFICATION_ID = 1001
-
-        const val ACTION_TOGGLE = "com.flashbar.TOGGLE"
-
-        const val ACTION_BRIGHT_UP =
-            "com.flashbar.BRIGHT_UP"
-
-        const val ACTION_BRIGHT_DOWN =
-            "com.flashbar.BRIGHT_DOWN"
-
-        const val ACTION_WIDTH_UP =
-            "com.flashbar.WIDTH_UP"
-
-        const val ACTION_WIDTH_DOWN =
-            "com.flashbar.WIDTH_DOWN"
-
-        const val ACTION_HEIGHT_UP =
-            "com.flashbar.HEIGHT_UP"
-
-        const val ACTION_HEIGHT_DOWN =
-            "com.flashbar.HEIGHT_DOWN"
-
-        const val ACTION_ROTATE =
-            "com.flashbar.ROTATE"
-
-        const val ACTION_MOVE =
-            "com.flashbar.MOVE"
-
-        const val ACTION_OFF =
-            "com.flashbar.OFF"
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-
-        windowManager =
-            getSystemService(WINDOW_SERVICE)
-                    as WindowManager
-
-        createNotificationChannel()
-
-        loadSettings()
-
-        startForeground(
-            NOTIFICATION_ID,
-            createNotification()
+        setContentView(
+            R.layout.activity_main
         )
 
-        if (Settings.canDrawOverlays(this)) {
-            showFlashBar()
-        }
-    }
+        findViewById<View>(
+            R.id.btnStart
+        ).setOnClickListener {
 
-    override fun onStartCommand(
-        intent: Intent?,
-        flags: Int,
-        startId: Int
-    ): Int {
-
-        when (intent?.action) {
-
-            ACTION_TOGGLE -> {
-
-                if (flashView == null) {
-                    showFlashBar()
-                } else {
-                    removeFlashBar()
-                }
-            }
-
-            ACTION_BRIGHT_UP -> {
-
-                brightness =
-                    min(
-                        1.0f,
-                        brightness + 0.1f
-                    )
-
-                saveSettings()
-                updateFlashBar()
-            }
-
-            ACTION_BRIGHT_DOWN -> {
-
-                brightness =
-                    max(
-                        0.1f,
-                        brightness - 0.1f
-                    )
-
-                saveSettings()
-                updateFlashBar()
-            }
-
-            // L = longer
-            ACTION_WIDTH_UP -> {
-
-                barLength =
-                    min(
-                        1500,
-                        barLength + 50
-                    )
-
-                saveSettings()
-                updateFlashBar()
-            }
-
-            // S = shorter
-            ACTION_WIDTH_DOWN -> {
-
-                barLength =
-                    max(
-                        100,
-                        barLength - 50
-                    )
-
-                saveSettings()
-                updateFlashBar()
-            }
-
-            // B = bigger/thicker
-            ACTION_HEIGHT_UP -> {
-
-                barThickness =
-                    min(
-                        500,
-                        barThickness + 20
-                    )
-
-                saveSettings()
-                updateFlashBar()
-            }
-
-            // P = thinner
-            ACTION_HEIGHT_DOWN -> {
-
-                barThickness =
-                    max(
-                        20,
-                        barThickness - 20
-                    )
-
-                saveSettings()
-                updateFlashBar()
-            }
-
-            ACTION_ROTATE -> {
-
-                horizontal = !horizontal
-
-                saveSettings()
-                updateFlashBar()
-            }
-
-            ACTION_MOVE -> {
-
-                moveMode = !moveMode
-
-                moveButton?.text =
-                    if (moveMode) "✓"
-                    else "✥"
-
-                updateNotification()
-            }
-
-            ACTION_OFF -> {
-
-                removeFlashBar()
-
-                stopSelf()
-
-                return START_NOT_STICKY
-            }
+            startFlashService()
         }
 
-        updateNotification()
+        findViewById<View>(
+            R.id.btnOverlay
+        ).setOnClickListener {
 
-        return START_STICKY
-    }
+            openOverlaySettings()
+        }
 
-    private fun showFlashBar() {
-
-        if (flashView != null) return
-
-        val bar =
-            LinearLayout(this)
-
-        bar.setBackgroundColor(
-            Color.WHITE
-        )
-
-        bar.alpha = brightness
+        requestNotificationPermission()
 
         /*
-         * Screen par sirf MOVE button.
-         * Bar ka actual white area transparent
-         * touch area ke saath rahega.
+         * App dobara khulte hi FlashBar ki
+         * settings fresh/default ho jayengi.
          */
-        bar.orientation =
-            LinearLayout.HORIZONTAL
-
-        bar.setPadding(
-            0,
-            0,
-            0,
-            0
-        )
-
-        val params =
-            WindowManager.LayoutParams(
-
-                if (horizontal)
-                    barLength
-                else
-                    barThickness,
-
-                if (horizontal)
-                    barThickness
-                else
-                    barLength,
-
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-
-                PixelFormat.TRANSLUCENT
-            )
-
-        params.gravity =
-            Gravity.TOP or Gravity.START
-
-        params.x = posX
-        params.y = posY
-
-        barParams = params
-
-        addMoveButton(bar)
-
-        windowManager.addView(
-            bar,
-            params
-        )
-
-        flashView = bar
+        resetFlashBarSettings()
     }
 
-    private fun addMoveButton(
-        bar: LinearLayout
-    ) {
-
-        val button =
-            TextView(this)
-
-        moveButton = button
-
-        button.text =
-            if (moveMode) "✓"
-            else "✥"
-
-        button.textSize = 20f
-
-        button.setTextColor(
-            Color.WHITE
-        )
-
-        button.setBackgroundColor(
-            Color.BLACK
-        )
-
-        button.gravity =
-            Gravity.CENTER
-
-        button.setPadding(
-            10,
-            0,
-            10,
-            0
-        )
-
-        val buttonParams =
-            LinearLayout.LayoutParams(
-                60,
-                60
-            )
-
-        button.layoutParams =
-            buttonParams
-
-        button.setOnClickListener {
-
-            moveMode = !moveMode
-
-            button.text =
-                if (moveMode)
-                    "✓"
-                else
-                    "✥"
-
-            updateNotification()
-        }
-
-        setupMoveDrag(button)
-
-        bar.addView(button)
-    }
-
-    private fun setupMoveDrag(
-        button: TextView
-    ) {
-
-        var startX = 0
-        var startY = 0
-
-        var touchX = 0f
-        var touchY = 0f
-
-        button.setOnTouchListener { _, event ->
-
-            if (!moveMode) {
-                return@setOnTouchListener false
-            }
-
-            when (event.action) {
-
-                MotionEvent.ACTION_DOWN -> {
-
-                    val params =
-                        barParams
-                            ?: return@setOnTouchListener false
-
-                    startX = params.x
-                    startY = params.y
-
-                    touchX = event.rawX
-                    touchY = event.rawY
-
-                    true
-                }
-
-                MotionEvent.ACTION_MOVE -> {
-
-                    val params =
-                        barParams
-                            ?: return@setOnTouchListener false
-
-                    params.x =
-                        startX +
-                                (
-                                    event.rawX -
-                                            touchX
-                                    ).toInt()
-
-                    params.y =
-                        startY +
-                                (
-                                    event.rawY -
-                                            touchY
-                                    ).toInt()
-
-                    posX = params.x
-                    posY = params.y
-
-                    val bar =
-                        flashView
-                            ?: return@setOnTouchListener false
-
-                    windowManager.updateViewLayout(
-                        bar,
-                        params
-                    )
-
-                    true
-                }
-
-                MotionEvent.ACTION_UP -> {
-
-                    saveSettings()
-
-                    true
-                }
-
-                else -> false
-            }
-        }
-    }
-
-    private fun updateFlashBar() {
-
-        val bar =
-            flashView ?: return
-
-        val params =
-            barParams ?: return
-
-        bar.alpha = brightness
-
-        if (horizontal) {
-
-            params.width =
-                barLength
-
-            params.height =
-                barThickness
-
-        } else {
-
-            params.width =
-                barThickness
-
-            params.height =
-                barLength
-        }
-
-        params.x = posX
-        params.y = posY
-
-        windowManager.updateViewLayout(
-            bar,
-            params
-        )
-    }
-
-    private fun removeFlashBar() {
-
-        flashView?.let {
-
-            try {
-                windowManager.removeView(it)
-            } catch (_: Exception) {
-            }
-        }
-
-        flashView = null
-        moveButton = null
-        barParams = null
-    }
-
-    private fun createNotificationChannel() {
+    private fun startFlashService() {
 
         if (
-            Build.VERSION.SDK_INT >=
-            Build.VERSION_CODES.O
+            !Settings.canDrawOverlays(this)
         ) {
 
-            val channel =
-                NotificationChannel(
-                    CHANNEL_ID,
-                    "FlashBar Controls",
-                    NotificationManager.IMPORTANCE_LOW
-                )
+            openOverlaySettings()
 
-            channel.description =
-                "FlashBar Controls"
-
-            val manager =
-                getSystemService(
-                    NotificationManager::class.java
-                )
-
-            manager.createNotificationChannel(
-                channel
-            )
+            return
         }
-    }
-
-    private fun actionIntent(
-        action: String
-    ): PendingIntent {
 
         val intent =
             Intent(
                 this,
-                ControlReceiver::class.java
+                FlashService::class.java
             )
 
-        intent.action = action
-
-        return PendingIntent.getBroadcast(
+        ContextCompat.startForegroundService(
             this,
-            action.hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or
-                    PendingIntent.FLAG_IMMUTABLE
+            intent
         )
     }
 
-    private fun createNotification(): Notification {
+    private fun resetFlashBarSettings() {
 
-        return Notification.Builder(
-            this,
-            CHANNEL_ID
-        )
-
-            .setSmallIcon(
-                android.R.drawable.ic_menu_view
+        val intent =
+            Intent(
+                this,
+                FlashService::class.java
             )
 
-            .setContentTitle(
-                "FlashBar"
+        intent.action =
+            FlashService.ACTION_RESET
+
+        if (
+            Settings.canDrawOverlays(this)
+        ) {
+
+            ContextCompat.startForegroundService(
+                this,
+                intent
             )
-
-            .setContentText(
-                if (flashView != null)
-                    "ON"
-                else
-                    "OFF"
-            )
-
-            .setOngoing(true)
-
-            .setCategory(
-                Notification.CATEGORY_SERVICE
-            )
-
-            // ON / OFF
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    "ON/OFF",
-                    actionIntent(ACTION_TOGGLE)
-                ).build()
-            )
-
-            // Brightness -
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    "D−",
-                    actionIntent(ACTION_BRIGHT_DOWN)
-                ).build()
-            )
-
-            // Brightness +
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    "D+",
-                    actionIntent(ACTION_BRIGHT_UP)
-                ).build()
-            )
-
-            // Shorter
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    "S",
-                    actionIntent(ACTION_WIDTH_DOWN)
-                ).build()
-            )
-
-            // Longer
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    "L",
-                    actionIntent(ACTION_WIDTH_UP)
-                ).build()
-            )
-
-            // Thicker
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    "B",
-                    actionIntent(ACTION_HEIGHT_UP)
-                ).build()
-            )
-
-            // Thinner
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    "P",
-                    actionIntent(ACTION_HEIGHT_DOWN)
-                ).build()
-            )
-
-            // Vertical
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    "V",
-                    actionIntent(ACTION_ROTATE)
-                ).build()
-            )
-
-            .build()
+        }
     }
 
-    private fun updateNotification() {
+    private fun openOverlaySettings() {
 
-        val manager =
-            getSystemService(
-                NotificationManager::class.java
+        val intent =
+            Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse(
+                    "package:$packageName"
+                )
             )
 
-        manager.notify(
-            NOTIFICATION_ID,
-            createNotification()
-        )
+        startActivity(intent)
     }
 
-    private fun saveSettings() {
+    private fun requestNotificationPermission() {
 
-        val prefs =
-            getSharedPreferences(
-                "flashbar_settings",
-                MODE_PRIVATE
-            )
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.TIRAMISU
+        ) {
 
-        prefs.edit()
+            if (
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
 
-            .putFloat(
-                "brightness",
-                brightness
-            )
-
-            .putInt(
-                "barLength",
-                barLength
-            )
-
-            .putInt(
-                "barThickness",
-                barThickness
-            )
-
-            .putInt(
-                "posX",
-                posX
-            )
-
-            .putInt(
-                "posY",
-                posY
-            )
-
-            .putBoolean(
-                "horizontal",
-                horizontal
-            )
-
-            .apply()
-    }
-
-    private fun loadSettings() {
-
-        val prefs =
-            getSharedPreferences(
-                "flashbar_settings",
-                MODE_PRIVATE
-            )
-
-        brightness =
-            prefs.getFloat(
-                "brightness",
-                1.0f
-            )
-
-        barLength =
-            prefs.getInt(
-                "barLength",
-                500
-            )
-
-        barThickness =
-            prefs.getInt(
-                "barThickness",
-                80
-            )
-
-        posX =
-            prefs.getInt(
-                "posX",
-                0
-            )
-
-        posY =
-            prefs.getInt(
-                "posY",
-                0
-            )
-
-        horizontal =
-            prefs.getBoolean(
-                "horizontal",
-                true
-            )
-    }
-
-    override fun onDestroy() {
-
-        removeFlashBar()
-
-        super.onDestroy()
-    }
-
-    override fun onBind(
-        intent: Intent?
-    ): IBinder? {
-
-        return null
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ),
+                    100
+                )
+            }
+        }
     }
 }
